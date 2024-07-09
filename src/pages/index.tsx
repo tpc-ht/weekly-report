@@ -1,131 +1,187 @@
-import { Button, Form, Input, Space, Typography, message } from "antd";
+import { FormLayout } from "@/components";
+import { Button, Col, Form, Input, Row, Space, Typography, message } from "antd";
+import { createStyles } from "antd-style";
 import dayjs from "dayjs";
 import ExcelJS from "exceljs";
-import { useState } from "react";
-import Table from "./Table";
-import { columns } from "./utils";
+import { useEffect, useRef, useState } from "react";
+import CurrentWeekTable from "./CurrentWeekTable";
+import NextWeekTable from "./NextWeekTable";
+import { columns, excelColumnId, isDate, reportParse } from "./utils";
 type dataType = {
   [key: string]: {
+    project: string;
+    module: string;
     content: string;
     startDate: string;
     endDate: string;
   };
 };
+const useStyles = createStyles(({ css }) => {
+  return {
+    main: css`
+      padding: 0 20px 20px;
+    `,
+  };
+});
+
 export default () => {
   const [form] = Form.useForm();
-  const [content, setContent] = useState(`投票管理 2024-06-24 - 2024-06-27
-投票设置交互调试
-作品设置表单功能开发与交互调试
-投票接口开发与接口联调
-预览模块样式优化与表单交互调整
-主表操作项功能开发联调
-分组显示问题调试
+  const { styles } = useStyles();
+  const dateRef = useRef("");
+  const [weekList, setWeekList] = useState<any[]>([]);
+  const [weekTitle, setWeekTitle] = useState<string>("");
+  const [nextWeekTitle, setNextWeekTitle] = useState<string>("");
+  const [nextWeekList, setNextWeekList] = useState<any[]>([]);
 
-jpos 2024-06-26 - 2024-06-27
-新用户登录密码重置开发
-系统参数配置接口调试，新增密码重置验证期限设置
-
-投票活动 2024-06-26 - 2024-06-26
-新增表单交互值丢失问题修复
-
-抽奖活动 2024-06-27 - 2024-06-27
-表字段显示调试
-
-系统 2024-06-28 - 2024-06-28
-富文本组件内容验证调试
-拦截器异常处理调试`);
-  const [data, setData] = useState<dataType>({
-    投票管理: { content: "投票设置交互调试\n作品设置表单功能开发与交互调试\n投票接口开发与接口联调\n预览模块样式优化与表单交互调整\n主表操作项功能开发联调\n分组显示问题调试\n", startDate: "2024-06-24", endDate: "2024-06-27" },
-    jpos: { content: "新用户登录密码重置开发\n系统参数配置接口调试，新增密码重置验证期限设置\n", startDate: "2024-06-26", endDate: "2024-06-27" },
-    投票活动: { content: "新增表单交互值丢失问题修复\n", startDate: "2024-06-26", endDate: "2024-06-26" },
-    抽奖活动: { content: "表字段显示调试\n", startDate: "2024-06-27", endDate: "2024-06-27" },
-    系统: { content: "富文本组件内容验证调试\n拦截器异常处理调试\n", startDate: "2024-06-28", endDate: "2024-06-28" },
-  });
-
-  const strFormat = (str: string, defaultProject: string) => {
-    const strArr = str.split(".")[1].trim().split(" ");
-    let data = {
-      project: defaultProject,
-      menu: "",
-      context: "",
-      isUse: false,
-    };
-    if (strArr.length === 2) {
-      data.menu = strArr[0];
-      data.context = strArr[1];
-    } else if (strArr.length === 3) {
-      data.project = strArr[0];
-      data.menu = strArr[1];
-      data.context = strArr[2];
-    }
-    return data;
-  };
-
-  const onFinish = (values: any) => {
+  useEffect(() => {
     try {
-      const strArr = values.content.split("\n");
-      let project = "商管";
+      const value = localStorage.getItem("weekReport");
+      value && form.setFieldsValue(JSON.parse(value));
+    } catch (error) {}
+  }, []);
+
+  const currentWeekParse = (values: any) => {
+    try {
+      const strArr = values.currentWeekReport.split("\n");
+      let project = values.project;
       let data: dataType = {};
-      const isDate = (date: string) => {
-        if (!data) return false;
-        const regex = /^\d\d\d\d[-](\d{1,2})[-](\d{1,2})$/;
-        return regex.test(date);
-      };
       const dateCompare = (oldDate: string, newDate: string) => (dayjs(newDate).unix() > dayjs(oldDate).unix() ? newDate : oldDate);
       let currentDate = "";
+      let msg = "";
+      strArr.forEach((item: string, index: number) => {
+        // 是否为时间分割
+        let strItem = item.trim();
+        if (strItem && !isDate(strItem)) {
+          const obj = reportParse(strItem, project);
+          if (data[obj.key]) {
+            data[obj.key].project = obj.project;
+            data[obj.key].module = obj.module;
+            data[obj.key].content += obj.context + "\n";
+            data[obj.key].endDate = dateCompare(data[obj.key].endDate, currentDate);
+          } else {
+            data[obj.key] = {
+              project: obj.project,
+              module: obj.module,
+              content: obj.context + "\n",
+              startDate: currentDate,
+              endDate: currentDate,
+            };
+          }
+        } else {
+          currentDate = dayjs(strItem).format("YYYY-MM-DD");
+          if (index === 0) {
+            const sDate = dayjs(currentDate).format("YYYY.MM.DD");
+            dateRef.current += sDate;
+            msg += `${dayjs(strItem).format("YYYY年MM月")}工作周报：${sDate}`;
+          }
+        }
+      });
+
+      const eDate = dayjs(currentDate).format("YYYY.MM.DD");
+      dateRef.current += `-${eDate}`;
+      msg += `-${eDate}      `;
+      msg += `部门：${values.department}      制表人：${values.leading}`;
+      setWeekTitle(msg);
+      const keys = Object.keys(data);
+
+      let ls = [];
+      for (let index = 0; index < keys.length; index++) {
+        const key = keys[index];
+        const item = data[key];
+        ls.push({
+          key: key,
+          project: item.project,
+          planType: "计划内",
+          taskType: "需求",
+          module: item.module,
+          workContent: item.content,
+          priority: "高",
+          difficulty: "B",
+          progress: "100%",
+          state: "开发完成，提测",
+          startDate: item.startDate,
+          endDate: item.endDate,
+          nextLeading: "测试",
+          reason: "",
+          leading: values.leading,
+        });
+      }
+      setWeekList(ls);
+    } catch (error) {
+      message.error("请输入正确的本周日报格式");
+    }
+  };
+
+  const nextWeekParse = (values: any) => {
+    try {
+      const strArr = values.nextWeekReport.split("\n");
+      let project = values.project;
+      let data: dataType = {};
+      let currentDate = "";
+      let endDate = "";
+
       strArr.forEach((item: string) => {
         // 是否为时间分割
         let strItem = item.trim();
 
-        if (strItem && !isDate(strItem)) {
-          const obj = strFormat(strItem, project);
-          if (obj.menu) {
-            if (data[obj.menu]) {
-              data[obj.menu].content += obj.context + "\n";
-              data[obj.menu].endDate = dateCompare(data[obj.menu].endDate, currentDate);
+        if (strItem) {
+          if (!currentDate) {
+            currentDate = strItem;
+            endDate = dayjs(strItem.split("-")[1]).format("YYYY-MM-DD");
+          } else {
+            const obj = reportParse(strItem, project);
+            if (data[obj.key]) {
+              data[obj.key].project = obj.project;
+              data[obj.key].module = obj.module;
+              data[obj.key].content += obj.context + "\n";
             } else {
-              data[obj.menu] = {
+              data[obj.key] = {
+                project: obj.project,
+                module: obj.module,
                 content: obj.context + "\n",
-                startDate: currentDate,
-                endDate: currentDate,
+                startDate: "",
+                endDate: endDate,
               };
             }
           }
-        } else {
-          currentDate = strItem;
         }
       });
-
+      const title = ` 下周工作计划：${currentDate}`;
+      setNextWeekTitle(title);
       const keys = Object.keys(data);
-      let text = "";
+
+      let ls = [];
       for (let index = 0; index < keys.length; index++) {
         const key = keys[index];
-        text += `${key} ${data[key].startDate} - ${data[key].endDate}\n${data[key].content}\n`;
+        const item = data[key];
+        ls.push({
+          key,
+          project: item.project,
+          taskType: "需求",
+          module: item.module,
+          workContent: item.content,
+          priority: "高",
+          difficulty: "B",
+          progress: "100%",
+          state: "开发完成，提测",
+          completionDate: item.endDate,
+          note: "",
+          leading: values.leading,
+        });
       }
-      console.log("text.trim()", JSON.stringify(data));
-      setData(data);
-      setContent(text.trim());
+      setNextWeekList(ls);
+      console.log("ls-next", ls);
     } catch (error) {
-      message.error("请输入正确的格式");
+      console.log("error", error);
+      message.error("请输入正确的下周计划格式");
     }
   };
-  const rowStyleFormat = (worksheet: ExcelJS.Worksheet, index: number) => {
-    let rows = worksheet.getRow(index);
-    rows.font = {
-      name: "微软雅黑",
-      size: 10,
-    };
-    rows.alignment = {
-      vertical: "middle",
-    };
-    rows.border = {
-      top: { style: "thin" },
-      left: { style: "thin" },
-      bottom: { style: "thin" },
-      right: { style: "thin" },
-    };
+  const onFinish = (values: any) => {
+    localStorage.setItem("weekReport", JSON.stringify(values));
+    currentWeekParse(values);
+    nextWeekParse(values);
   };
-  const setExcelGlobalStyle = (worksheet: ExcelJS.Worksheet) => {
+  const setExcelGlobalStyle = (worksheet: ExcelJS.Worksheet, secondTableColNumber: number) => {
     // 创建一个样式对象，设置所需的样式属性
     const globalStyle: any = {
       font: {
@@ -143,23 +199,43 @@ jpos 2024-06-26 - 2024-06-27
         right: { style: "thin" },
       },
     };
+    const leftRegex = /B\d+/;
+    const rightRegex01 = /P\d+/;
+
+    const rightRegex02 = /N\d+/;
     worksheet.eachRow((row, rowNumber) => {
-      row.eachCell((cell, colNumber) => {
-        console.log("cell", cell);
-        // const num = cell.address.substring(1);
-        // if (num !== "1" && num !== "2") {
-        //   // cell.column = colNumber
-        // }
-        cell.style.font = { ...globalStyle.font, ...cell.style.font };
-        cell.style.alignment = { ...globalStyle.alignment, ...cell.style.alignment };
-        cell.style.border = { ...globalStyle.border, ...cell.style.border };
+      row.eachCell((cell) => {
+        if (excelColumnId.includes(cell.address[0])) {
+          cell.style.font = { ...globalStyle.font, ...cell.style.font };
+          cell.style.alignment = { ...globalStyle.alignment, ...cell.style.alignment };
+          let border = { ...globalStyle.border, ...cell.style.border };
+          if (leftRegex.test(cell.address)) {
+            border = {
+              ...border,
+              left: { style: "medium" },
+            };
+          }
+          if (rightRegex01.test(cell.address)) {
+            border = {
+              ...border,
+              right: { style: "medium" },
+            };
+          }
+          if (rightRegex02.test(cell.address) && rowNumber >= secondTableColNumber) {
+            border = {
+              ...border,
+              right: { style: "medium" },
+            };
+          }
+          cell.style.border = border;
+        }
       });
     });
   };
-  const setTitle = (worksheet: ExcelJS.Worksheet) => {
+  const setCurrentWeekTitle = (worksheet: ExcelJS.Worksheet) => {
     // 设置表格标题
-    worksheet.mergeCells("B1:P1");
-    const titleCell = worksheet.getCell("B1:P1");
+    worksheet.mergeCells("B2:P2");
+    const titleCell = worksheet.getCell("B2:P2");
     titleCell.value = "研发部工作周报";
     titleCell.font = {
       size: 18,
@@ -169,9 +245,12 @@ jpos 2024-06-26 - 2024-06-27
       vertical: "middle",
       horizontal: "center",
     };
-    worksheet.mergeCells("B2:P2");
-    const titleCell2 = worksheet.getCell("B2:P2");
-    titleCell2.value = `2024年06月工作周报：24.06.24-24.06.28                                                                      部门：       前端组              制表人：      唐鹏程`;
+    titleCell.border = {
+      top: { style: "medium" },
+    };
+    worksheet.mergeCells("B3:P3");
+    const titleCell2 = worksheet.getCell("B3:P3");
+    titleCell2.value = weekTitle;
     titleCell2.font = {
       bold: true,
     };
@@ -180,91 +259,125 @@ jpos 2024-06-26 - 2024-06-27
       horizontal: "left",
     };
   };
-  const exportFileTest = async () => {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Sheet1");
+  const setCurrentWeekBody = (worksheet: ExcelJS.Worksheet) => {
+    worksheet.columns = columns;
+    worksheet.addRow(["", "序号", "项目名称", "计划类型", "任务类型", "功能模块", "工作内容", "优先级", "难度", "完成进度", "任务状态", "计划开始日期", "计划结束日期", "下阶段负责人", "未完成原因分析", "负责人"], "A10");
+    for (let index = 0; index < weekList.length; index++) {
+      const { key, project, planType, taskType, module, workContent, priority, difficulty, progress, state, startDate, endDate, nextLeading, reason, leading } = weekList[index];
+      worksheet.addRow(["", index + 1, project, planType, taskType, module, workContent.trim(), priority, difficulty, progress, state, startDate, endDate, nextLeading, reason, leading]);
+    }
+  };
+  const setCurrentWeekFooter = (worksheet: ExcelJS.Worksheet, cIndex: number) => {
+    // 表底部
+    const footerAddress01 = `B${cIndex}:C${cIndex}`;
+    const footerValueAddress01 = `D${cIndex}:P${cIndex}`;
+    worksheet.mergeCells(footerAddress01);
+    const footerCell01 = worksheet.getCell(footerAddress01);
+    footerCell01.value = "工作总结（必填）：";
+    worksheet.mergeCells(footerValueAddress01);
+    const footerValueCell01 = worksheet.getCell(footerValueAddress01);
+    footerValueCell01.value = "按计划进行";
+    footerValueCell01.style.alignment = {
+      vertical: "middle",
+      horizontal: "center",
+    };
+    let cIndex02 = cIndex + 1;
+    const footerAddress02 = `B${cIndex02}:C${cIndex02}`;
+    const footerValueAddress02 = `D${cIndex02}:P${cIndex02}`;
+    worksheet.mergeCells(footerAddress02);
+    const footerCell02 = worksheet.getCell(footerAddress02);
+    footerCell02.value = "风险及建议";
+    footerCell02.style.border = {
+      bottom: { style: "medium" },
+    };
+    worksheet.mergeCells(footerValueAddress02);
+    const footerValueCell02 = worksheet.getCell(footerValueAddress02);
+    footerValueCell02.style.alignment = {
+      vertical: "middle",
+      horizontal: "center",
+    };
+    footerValueCell02.style.border = {
+      bottom: { style: "medium" },
+    };
+  };
 
-    // 设置标题
-    worksheet.getCell("A1").value = "姓名";
-    worksheet.getCell("B1").value = "年龄";
-    worksheet.getCell("C1").value = "性别";
+  const setNextWeekHeader = (worksheet: ExcelJS.Worksheet, cIndex: number) => {
+    worksheet.mergeCells(`B${cIndex}:N${cIndex}`);
+    const titleCell2 = worksheet.getCell(`B${cIndex}:N${cIndex}`);
+    titleCell2.value = ` 下周工作计划：24.07.08-24.07.12`;
+    titleCell2.font = {
+      bold: true,
+    };
+    titleCell2.alignment = {
+      vertical: "middle",
+      horizontal: "left",
+    };
+    titleCell2.border = {
+      top: { style: "medium" },
+    };
+  };
+  const setNextWeekBody = (worksheet: ExcelJS.Worksheet, cIndex: number) => {
+    worksheet.addRow(["", "序号", "项目名称", "任务类型", "功能模块", "功能模块", "工作内容", "优先级", "难度", "计划完成进度", "计划测试状态", "计划完成日期", "补充说明", "责任人"]);
 
-    // 添加行数据
-    // worksheet.addRow(["张三", 25, "男"]);
-    // worksheet.addRow(["李四", 30, "女"]);
-    worksheet.addRow({ id: 1, name: "John Doe", dob: new Date(1970, 1, 1) });
-    worksheet.addRow({ id: 2, name: "Jane Doe", dob: new Date(1965, 1, 7) });
+    worksheet.mergeCells(`E${cIndex}:F${cIndex}`);
+    let cIndex01 = cIndex;
+    for (let index = 0; index < nextWeekList.length; index++) {
+      const { project, taskType, module, workContent, priority, difficulty, progress, state, completionDate, note, leading } = nextWeekList[index];
+      cIndex01 += 1;
+      worksheet.addRow(["", index + 1, project, taskType, module, module, workContent.trim(), priority, difficulty, progress, state, completionDate, note, leading]);
+      worksheet.mergeCells(`E${cIndex01}:F${cIndex01}`);
+    }
+  };
+  const setNextWeekFooter = (worksheet: ExcelJS.Worksheet, cIndex: number) => {
+    const footerAddress03 = `B${cIndex}:C${cIndex}`;
+    const footerValueAddress03 = `D${cIndex}:N${cIndex}`;
+    worksheet.mergeCells(footerAddress03);
+    const footerCell03 = worksheet.getCell(footerAddress03);
+    footerCell03.value = "风险问题";
+    worksheet.mergeCells(footerValueAddress03);
 
-    // 保存 Excel 文件
-    // await workbook.xlsx.writeFile("example.xlsx");
-
-    // 导出表格
-    workbook.xlsx.writeBuffer().then((buffer) => {
-      const blob = new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "周报1.xlsx";
-      link.click();
-      URL.revokeObjectURL(link.href); // 下载完成释放掉blob对象
-    });
+    let cIndex01 = cIndex + 1;
+    const footerAddress04 = `B${cIndex01}:C${cIndex01}`;
+    const footerValueAddress04 = `D${cIndex01}:N${cIndex01}`;
+    worksheet.mergeCells(footerAddress04);
+    const footerCell04 = worksheet.getCell(footerAddress04);
+    footerCell04.value = "沟通协调";
+    footerCell04.style.border = {
+      bottom: { style: "medium" },
+    };
+    worksheet.mergeCells(footerValueAddress04);
+    const footerValueCell04 = worksheet.getCell(footerValueAddress04);
+    footerValueCell04.style.alignment = {
+      vertical: "middle",
+      horizontal: "center",
+    };
+    footerValueCell04.style.border = {
+      bottom: { style: "medium" },
+    };
   };
   const exportFile = () => {
+    const value = form.getFieldsValue();
     // 创建工作簿
     const workbook = new ExcelJS.Workbook();
     // 添加工作表
-    const worksheet = workbook.addWorksheet("sheet1", {
-      headerFooter: { firstHeader: "Hello Exceljs", firstFooter: "Hello World" },
-    });
-    setTitle(worksheet);
-    worksheet.columns = columns;
-    // worksheet.addRow();
-    const headerStyle = {
-      font: { bold: true },
-      alignment: { horizontal: "center" },
-    };
-    worksheet.addRow(["", "序号", "项目名称", "计划类型", "任务类型", "功能模块", "工作内容", "优先级", "难度", "完成进度", "任务状态", "计划开始日期", "计划结束日期", "下阶段负责人", "未完成原因分析", "负责人"], "A10");
-    // 添加表体数据
-    const keys = Object.keys(data);
-    let orgName = form.getFieldValue("orgName");
-    for (let index = 0; index < keys.length; index++) {
-      const key = keys[index];
-      // rowStyleFormat(worksheet, index + 1);
-      worksheet.addRow(["", index + 1, orgName, "计划内", "需求", key, data[key].content.trim(), "高", "B", "100%", "开发完成，提测", data[key].startDate.trim(), data[key].endDate.trim(), "测试", "", "唐***"]);
+    const worksheet = workbook.addWorksheet("sheet1");
+    worksheet.addRow([]);
+    setCurrentWeekTitle(worksheet);
+    setCurrentWeekBody(worksheet);
+    const cIndex01 = 5 + weekList.length;
+    setCurrentWeekFooter(worksheet, cIndex01);
 
-      // {
-      //   index: index + 1,
-      //   orgName: orgName,
-      //   planType: "计划内",
-      //   taskType: "需求",
-      //   module: key,
-      //   content: data[key].content.trim(),
-      //   priority: "高",
-      //   difficulty: "B",
-      //   progress: "100%",
-      //   state: "开发完成，提测",
-      //   startDate: data[key].startDate.trim(),
-      //   endDate: data[key].endDate.trim(),
-      //   nextLeader: "测试",
-      //   note: "",
-      //   leader: "唐***",
-      // }
-    }
+    const cIndex02 = cIndex01 + 3;
+    setNextWeekHeader(worksheet, cIndex02);
 
-    // rowStyleFormat(worksheet, keys.length + 1);
-    setExcelGlobalStyle(worksheet);
+    let cIndex03 = cIndex02 + 1;
+    setNextWeekBody(worksheet, cIndex03);
 
-    console.log("worksheet", worksheet);
-    // const bp = worksheet.model.getRanges("B2:P8");
-    // const bp = workbook.definedNames.getRanges("sheet1");
-    // 设置 A1:B2 单元格的样式
-    // worksheet.getRanges("B2:P8").font = {
-    //   bold: true,
-    //   color: { argb: "FF0000" },
-    // };
-    // console.log("bp", bp);
+    let cIndex04 = cIndex03 + nextWeekList.length + 1;
+    setNextWeekFooter(worksheet, cIndex04);
 
+    // 全局样式
+    setExcelGlobalStyle(worksheet, cIndex02);
     // 导出表格
     workbook.xlsx.writeBuffer().then((buffer) => {
       const blob = new Blob([buffer], {
@@ -272,92 +385,139 @@ jpos 2024-06-26 - 2024-06-27
       });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = "周报.xlsx";
+      link.download = `${value.department ? value.department + "_" : ""}${value.leading ? value.leading + "_" : ""}${dateRef.current ? dateRef.current + "_" : ""}工作周报.xlsx`;
       link.click();
       URL.revokeObjectURL(link.href); // 下载完成释放掉blob对象
     });
   };
   return (
-    <div>
-      <Form
-        onFinish={onFinish}
-        form={form}
-        layout="vertical"
-        name="dynamic_form_complex"
-        style={{
-          maxWidth: 600,
-          margin: "0 auto",
-        }}
-        autoComplete="off"
-        initialValues={{
-          items: [{}],
-          orgName: "crm",
-          content: `2024-06-24
-        1. 投票管理 投票设置交互调试
-        2. 投票管理 作品设置表单功能开发与交互调试
-        2024-06-25
-        1. 投票管理 投票接口开发与接口联调
-        2. 投票管理 预览模块样式优化与表单交互调整
-        3. 投票管理 主表操作项功能开发联调
-        2024-06-26
-        1. jpos 新用户登录密码重置开发
-        2. 投票活动 新增表单交互值丢失问题修复
-        2024-06-27
-        1. jpos 系统参数配置接口调试，新增密码重置验证期限设置
-        2. 抽奖活动 表字段显示调试
-        3. 投票管理 分组显示问题调试
-        2024-06-28
-        1. 系统 富文本组件内容验证调试
-        2. 系统 拦截器异常处理调试`,
-        }}
-      >
-        <Form.Item label="项目名称" name={"orgName"}>
-          <Input placeholder="请输入" />
-        </Form.Item>
-        <Form.Item
-          label="日报内容"
-          rules={[
-            {
-              required: true,
-            },
-          ]}
-          name={"content"}
-          tooltip={
-            <div>
-              格式：
-              <div>2024-04-01</div>
-              <div>1. 人员管理 功能开发</div>
-              <div>2. 角色管理 XXXX开发</div>
-            </div>
-          }
-        >
-          <Input.TextArea rows={6} placeholder="请输入" />
-        </Form.Item>
-        <Space
-          style={{
-            width: "100%",
-            justifyContent: "flex-end",
+    <div className={styles.main}>
+      <Typography.Title level={3} style={{ textAlign: "center" }}>
+        周报生成工具
+      </Typography.Title>
+      <FormLayout>
+        <Form
+          onFinish={onFinish}
+          form={form}
+          autoComplete="off"
+          initialValues={{
+            project: "crm",
+            department: "前端部",
+            summary: "计划进行",
           }}
         >
-          <Button type="primary" style={{ margin: "0 auto" }} htmlType="submit">
-            解析
-          </Button>
-          <Button disabled={!Object.keys(data).length} style={{ margin: "0 auto" }} onClick={exportFile}>
-            导出
-          </Button>
-          <Button disabled={!Object.keys(data).length} style={{ margin: "0 auto" }} onClick={exportFileTest}>
-            导出2
-          </Button>
-        </Space>
-        <Form.Item label="结果" noStyle shouldUpdate style={{ minHeight: 300 }}>
-          {() => (
-            <Typography>
-              <pre style={{ minHeight: 300 }}>{content}</pre>
-            </Typography>
-          )}
-        </Form.Item>
-      </Form>
-      <Table />
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                label="默认项目名称"
+                rules={[
+                  {
+                    required: true,
+                  },
+                ]}
+                name={"project"}
+              >
+                <Input placeholder="请输入" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                label="部门"
+                rules={[
+                  {
+                    required: true,
+                  },
+                ]}
+                name={"department"}
+              >
+                <Input placeholder="请输入" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                label="负责人"
+                rules={[
+                  {
+                    required: true,
+                  },
+                ]}
+                name={"leading"}
+              >
+                <Input placeholder="请输入" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            label="工作总结"
+            rules={[
+              {
+                required: true,
+              },
+            ]}
+            name={"summary"}
+          >
+            <Input placeholder="请输入" />
+          </Form.Item>
+          <Form.Item
+            label="本周日报"
+            rules={[
+              {
+                required: true,
+              },
+            ]}
+            name={"currentWeekReport"}
+            tooltip={
+              <div>
+                格式：
+                <div>2024-01-01</div>
+                <div>1. [项目名称] 模块名称 工作内容</div>
+                <div>2024-01-02</div>
+                <div>1. [项目名称] 模块名称 工作内容</div>
+              </div>
+            }
+          >
+            <Input.TextArea rows={6} placeholder="请输入" />
+          </Form.Item>
+          <Form.Item
+            label="下周计划"
+            rules={[
+              {
+                required: true,
+              },
+            ]}
+            name={"nextWeekReport"}
+            tooltip={
+              <div>
+                格式：
+                <div>2024.07.08-2024.07.12</div>
+                <div>1. [项目名称] 模块名称 工作内容</div>
+              </div>
+            }
+          >
+            <Input.TextArea rows={6} placeholder="请输入" />
+          </Form.Item>
+          <Space
+            style={{
+              width: "100%",
+              justifyContent: "flex-end",
+            }}
+          >
+            <Button type="primary" style={{ margin: "0 auto" }} htmlType="submit">
+              解析
+            </Button>
+            <Button disabled={!(weekList.length && nextWeekList.length)} style={{ margin: "0 auto" }} onClick={exportFile}>
+              导出
+            </Button>
+          </Space>
+        </Form>
+      </FormLayout>
+      <Typography.Title level={4}>本周周报预览</Typography.Title>
+      <Typography.Paragraph>{weekTitle}</Typography.Paragraph>
+      <CurrentWeekTable data={weekList} />
+      <Typography.Title level={4}>下周报预览</Typography.Title>
+      <Typography.Paragraph>{nextWeekTitle}</Typography.Paragraph>
+      <NextWeekTable data={nextWeekList} />
     </div>
   );
 };

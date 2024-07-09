@@ -1,10 +1,10 @@
+import dayjs from "dayjs";
 import { Column } from "exceljs";
 
 export const columns: Partial<Column>[] = [
     {
         header: "",
         key: "",
-        // mergeCells
         width: 2,
     },
     {
@@ -20,7 +20,7 @@ export const columns: Partial<Column>[] = [
     {
         // header: "项目名称",
         key: "orgName",
-        width: 10,
+        width: 12,
         style: {
             alignment: {
                 horizontal: "center",
@@ -86,7 +86,7 @@ export const columns: Partial<Column>[] = [
     {
         // header: "完成进度",
         key: "progress",
-        width: 10,
+        width: 12,
         style: {
             alignment: {
                 horizontal: "center",
@@ -154,3 +154,39 @@ export const columns: Partial<Column>[] = [
         },
     },
 ]
+
+
+export const excelColumnId = ["B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"];
+
+export const isString = (str: string) => {
+
+}
+// 日报解析
+export const reportParse = (report: string, project: string) => {
+    const reports = report.split(".")[1].trim().split(" ").filter(e => !!e);
+    let data = {
+        project,
+        key: project,
+        module: "",
+        context: "",
+        isUse: false,
+    };
+    if (reports.length === 2) {
+        data.key = `${project}-${reports[0]}`;
+        data.module = reports[0];
+        data.context = reports[1];
+    } else if (reports.length === 3) {
+        data.key = `${reports[0]}-${reports[1]}`;
+        data.project = reports[0];
+        data.module = reports[1];
+        data.context = reports[2];
+    }
+    return data;
+
+};
+
+export const isDate = (date: string) => {
+    if (!date) return false;
+    return dayjs(date).isValid();
+};
+
