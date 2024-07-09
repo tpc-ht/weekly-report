@@ -7,9 +7,9 @@ export default defineConfig({
     ],
     npmClient: 'pnpm',
     title: '周报生成工具',
-    // history: {
-    //     type: 'hash',
-    // },
+    history: {
+        type: 'hash',
+    },
     publicPath: process.env.NODE_ENV === 'production' ? './' : '/'
 
 });
