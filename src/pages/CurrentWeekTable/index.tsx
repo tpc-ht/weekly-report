@@ -72,14 +72,14 @@ const columns: TableProps<DataType>["columns"] = [
     title: "任务状态",
   },
   {
-    dataIndex: "startDate",
+    dataIndex: "endDate",
     width: 120,
-    title: "计划开始日期",
+    title: "计划完成日期",
   },
   {
     dataIndex: "endDate",
     width: 120,
-    title: "计划结束日期",
+    title: "实际完成日期",
   },
   {
     dataIndex: "nextLeading",

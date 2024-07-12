@@ -261,10 +261,11 @@ export default () => {
   };
   const setCurrentWeekBody = (worksheet: ExcelJS.Worksheet) => {
     worksheet.columns = columns;
-    worksheet.addRow(["", "序号", "项目名称", "计划类型", "任务类型", "功能模块", "工作内容", "优先级", "难度", "完成进度", "任务状态", "计划开始日期", "计划结束日期", "下阶段负责人", "未完成原因分析", "负责人"], "A10");
+    worksheet.addRow(["", "序号", "项目名称", "计划类型", "任务类型", "功能模块", "工作内容", "优先级", "难度", "完成进度", "任务状态", "计划完成日期", "实际完成日期", "下阶段负责人", "未完成原因分析", "负责人"], "A10");
     for (let index = 0; index < weekList.length; index++) {
       const { key, project, planType, taskType, module, workContent, priority, difficulty, progress, state, startDate, endDate, nextLeading, reason, leading } = weekList[index];
-      worksheet.addRow(["", index + 1, project, planType, taskType, module, workContent.trim(), priority, difficulty, progress, state, startDate, endDate, nextLeading, reason, leading]);
+      // worksheet.addRow(["", index + 1, project, planType, taskType, module, workContent.trim(), priority, difficulty, progress, state, startDate, endDate, nextLeading, reason, leading]);
+      worksheet.addRow(["", index + 1, project, planType, taskType, module, workContent.trim(), priority, difficulty, progress, state, endDate, endDate, nextLeading, reason, leading]);
     }
   };
   const setCurrentWeekFooter = (worksheet: ExcelJS.Worksheet, cIndex: number) => {
