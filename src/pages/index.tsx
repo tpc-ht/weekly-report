@@ -71,14 +71,12 @@ export default () => {
           currentDate = dayjs(strItem).format("YYYY-MM-DD");
           if (index === 0) {
             const sDate = dayjs(currentDate).format("YYYY.MM.DD");
-            dateRef.current += sDate;
             msg += `${dayjs(strItem).format("YYYY年MM月")}工作周报：${sDate}`;
           }
         }
       });
 
       const eDate = dayjs(currentDate).format("YYYY.MM.DD");
-      dateRef.current += `-${eDate}`;
       msg += `-${eDate}      `;
       msg += `部门：${values.department}      制表人：${values.leading}`;
       setWeekTitle(msg);
@@ -117,7 +115,7 @@ export default () => {
       const strArr = values.nextWeekReport.split("\n");
       let project = values.project;
       let data: dataType = {};
-      let currentDate = "";
+      let nextWeekDate = "";
       let endDate = "";
 
       strArr.forEach((item: string) => {
@@ -125,8 +123,8 @@ export default () => {
         let strItem = item.trim();
 
         if (strItem) {
-          if (!currentDate) {
-            currentDate = strItem;
+          if (!nextWeekDate) {
+            nextWeekDate = strItem;
             endDate = dayjs(strItem.split("-")[1]).format("YYYY-MM-DD");
           } else {
             const obj = reportParse(strItem, project);
@@ -146,7 +144,8 @@ export default () => {
           }
         }
       });
-      const title = ` 下周工作计划：${currentDate}`;
+      const title = ` 下周工作计划：${nextWeekDate}`;
+      dateRef.current = nextWeekDate;
       setNextWeekTitle(title);
       const keys = Object.keys(data);
 
@@ -305,7 +304,7 @@ export default () => {
   const setNextWeekHeader = (worksheet: ExcelJS.Worksheet, cIndex: number) => {
     worksheet.mergeCells(`B${cIndex}:N${cIndex}`);
     const titleCell2 = worksheet.getCell(`B${cIndex}:N${cIndex}`);
-    titleCell2.value = ` 下周工作计划：24.07.08-24.07.12`;
+    titleCell2.value = nextWeekTitle;
     titleCell2.font = {
       bold: true,
     };
