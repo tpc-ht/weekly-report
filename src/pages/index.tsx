@@ -47,6 +47,7 @@ export default () => {
       let data: dataType = {};
       const dateCompare = (oldDate: string, newDate: string) => (dayjs(newDate).unix() > dayjs(oldDate).unix() ? newDate : oldDate);
       let currentDate = "";
+      let currentWeekDate = "";
       let msg = "";
       strArr.forEach((item: string, index: number) => {
         // 是否为时间分割
@@ -71,14 +72,16 @@ export default () => {
           currentDate = dayjs(strItem).format("YYYY-MM-DD");
           if (index === 0) {
             const sDate = dayjs(currentDate).format("YYYY.MM.DD");
-            msg += `${dayjs(strItem).format("YYYY年MM月")}工作周报：${sDate}`;
+            currentWeekDate += sDate;
+            msg += `${dayjs(strItem).format("YYYY年MM月")}工作周报：`;
           }
         }
       });
 
       const eDate = dayjs(currentDate).format("YYYY.MM.DD");
-      msg += `-${eDate}      `;
-      msg += `部门：${values.department}      制表人：${values.leading}`;
+      currentWeekDate += `-${eDate}`;
+      dateRef.current = currentWeekDate;
+      msg += `${currentWeekDate}      部门：${values.department}      制表人：${values.leading}`;
       setWeekTitle(msg);
       const keys = Object.keys(data);
 
@@ -145,7 +148,6 @@ export default () => {
         }
       });
       const title = ` 下周工作计划：${nextWeekDate}`;
-      dateRef.current = nextWeekDate;
       setNextWeekTitle(title);
       const keys = Object.keys(data);
 
